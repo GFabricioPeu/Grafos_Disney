@@ -4,14 +4,18 @@ import numpy as np
 import networkx as nx
 import sklearn.feature_extraction.text as skt
 import sklearn.cluster as skc
+import re
 
 remover = {'as','the', 'and', 'if','that','in','when','so','where','at','but','or','to'}
 
+'''
+INUTIL POREM DEU TRABALHO
 
 def limpa_description(D):
     if not isinstance(D,str):
         return ""
     
+    palavras 
     palavras = D.split()
     palavras_resultado = [palavra for palavra in palavras if palavra.lower() not in remover]
 
@@ -34,16 +38,20 @@ def trata_arquivo (corpus):
     corpus['cast']= corpus['cast'].apply(limpa_cast)
 
     return corpus
-
+'''
 
 
 def cria_grafo (arquivo):
     df = pd.read_csv(arquivo)
-    corpus = df['show_id','title','director','cast','country','listed_in','description'].fillna('').tolist()
-    corpus = trata_arquivo(corpus)
+    corpus = df[['show_id','type','title','director','cast','country','rating','listed_in','description']].fillna('').tolist()
+    
+    for collums in ['type','title','director','cast','country','listed_in','description']:
 
-    vectorizer = skt.TfidfVectorizer()
-    matriz_vetorizada = vectorizer.fit_transform(corpus)
+        vectorizer = skt.TfidfVectorizer(stop_words=remover)
+        matriz_vetorizada = vectorizer.fit_transform(corpus)
+
+
+        
     kmeans = skc.MiniBatchKMeans(n_clusters=100,random_state=9).fit(matriz_vetorizada)
 
     grafo = nx.Graph()
