@@ -69,7 +69,10 @@ def cria_grafo (arquivo):
     for i in range(similaridade.shape[0]):
         for j in range(i+1,similaridade.shape[1]):
             if similaridade[i,j] > lim_similaridade:
-                grafo.add_edge()
+                grafo.add_edge(df.iloc[i]['show_id'],df.iloc[j]['show_id'],weight=similaridade[i,j])
+
+    return grafo
+
 
 def main():
     arquivo = 'disney_plus_title_list.csv'
