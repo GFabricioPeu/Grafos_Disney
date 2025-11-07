@@ -77,6 +77,8 @@ def cria_grafo (arquivo):
 def main():
     arquivo = 'disney_plus_title_list.csv'
     grafo = cria_grafo(arquivo)
+    
+
 
 
 
