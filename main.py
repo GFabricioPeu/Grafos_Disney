@@ -24,7 +24,7 @@ def limpa_lista(C):
     if not isinstance(C,str):
         return []
     
-    itens =[itens.strip() for item in C.split (',') if item.strip()]
+    itens =[item.strip() for item in C.split (',') if item.strip()]
 
     return itens
 
@@ -59,24 +59,30 @@ def cria_grafo (arquivo):
     corpus_index = corpus.set_index('show_id')
 
     for show_id, row in corpus_index.iterrows():
+        titulo = row.get('title', 'N/A')
         grafo.add_node(
             show_id, 
             type='Filme', # Tipo de nó
             title=row.get('title', 'N/A'), 
             cluster=row.get('cluster', -1)
         )
+        if titulo != 'N/A':
+            grafo.graph['titulo_para_id'][titulo.lower().strip()] = show_id
+        for ator in row['cast']:
+            grafo.add_node(ator, type='Ator')
+            grafo.add_edge(show_id, ator, type='Tem_ator')
 
-    for diretor in row['director']:
-        grafo.add_node(diretor, type = 'Diretor')
-        grafo.add_edge(show_id,diretor,type='Tem_diretor')
+        for diretor in row['director']:
+            grafo.add_node(diretor, type = 'Diretor')
+            grafo.add_edge(show_id,diretor,type='Tem_diretor')
 
-    for categoria in row['listed_in']:
-        grafo.add_node(categoria, type='Categoria')
-        grafo.add_edge(show_id, categoria, type='Tem_categoria')
-    
-    for pais in row['country']:
-        grafo.add_node(pais, type='Pais')
-        grafo.add_edge(show_id, pais, type='Tem_pais')
+        for categoria in row['listed_in']:
+            grafo.add_node(categoria, type='Categoria')
+            grafo.add_edge(show_id, categoria, type='Tem_categoria')
+
+        for pais in row['country']:
+            grafo.add_node(pais, type='Pais')
+            grafo.add_edge(show_id, pais, type='Tem_pais')
 
 
     similaridade = cosine_similarity(matriz_vetorizada)
@@ -104,7 +110,7 @@ def mostra_vizinhos(grafo,id_central):
             grafo.edges[id_central, vizinho].get('type') == 'Similar'):
             vizinhos_cos.add(vizinho)
 
-    #Agora pegar os nós Adamic-Adar
+    #Agora pega os nós Adamic-Adar
     nos_filme = {n for n, d in grafo.nodes(data=True) if d.get('type') == 'Filme'}
     nos_Ada = nos_filme - vizinhos_cos - {id_central}
     
@@ -125,14 +131,16 @@ def mostra_vizinhos(grafo,id_central):
 
     for v in vizinhos_cos:
         if v in subgrafo:
-            subgrafo.add_edge(id_central,v,typr='Similar')
+            subgrafo.add_edge(id_central,v,type='Similar')
 
     for u, v, score in recomTopo:
         subgrafo.add_edge(u, v, weight=score, type='Adamic_Adar')
 
-    labels = {node_id: grafo.nodes[node_id].get('title', node_id) 
-              for node_id in subgrafo.nodes()} 
-    pos = nx.spring_layout(subgrafo, k=0.7, seed=10)
+    labels = {node_id: grafo.nodes[node_id].get('title', node_id) for node_id in subgrafo.nodes()} 
+
+    vizinhos = [node for node in subgrafo.nodes() if node != id_central]
+    shells = [ [id_central], vizinhos ]
+    pos = nx.shell_layout(subgrafo, shells)
     edges_cos = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Similar']
     edges_aa = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Adamic_Adar']
 
@@ -146,22 +154,42 @@ def mostra_vizinhos(grafo,id_central):
     
     nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_aa, edge_color='red', style='dashed', alpha=1.0, label='Recomendado (Adamic-Adar)')
 
-    plt.title("Parecidos com: {labels[id_central]}")
+    plt.title(f"Parecidos com: {labels[id_central]}")
     plt.axis('off')
     plt.legend()
+    plt.show()
+
+
 
 def recomenda(titulo_filme,grafo):
 
-    print(f"\nBuscando recomendacoes parecidadas com {titulo_filme}")
+    print(f"\nBuscando recomendacoes parecidas com {titulo_filme}")
+
     mapa_de_titulos = grafo.graph.get('titulo_para_id', {})
-    show_id = mapa_de_titulos.get(titulo_filme.lower())
+    titulo_lower = titulo_filme.lower().strip()
+    show_id = mapa_de_titulos.get(titulo_lower)
 
     if not show_id:
         print("Titulo nao foi encontrado")
+        parece_pouco = [db_titulo for db_titulo in mapa_de_titulos.keys() if db_titulo in titulo_lower]
+        
+        if parece_pouco:
+            parece_mais = max(parece_pouco,key=len)
+            show_id = mapa_de_titulos[parece_mais]
+            achou_parecido = grafo.nodes[show_id].get('title')
+            print(f"\n Nao foi possivel encontrar o titulo informado. Porem foi achado um parecido: {achou_parecido}")
 
-        parecidos = [t for t in mapa_de_titulos.keys() if titulo_filme.lower() in t]
+    if not show_id:
+        print("\n Erro em achar o titulo informado no grafo")
+
+        parecidos = [
+            db_titulo for db_titulo in mapa_de_titulos.keys() 
+            if titulo_lower in db_titulo
+        ]
         if parecidos:
-            print(f"Quer dizer: {parecidos[:3]}?")
+
+            titulos_parecidos = [grafo.nodes[mapa_de_titulos[t]].get('title') for t in parecidos]
+            print(f"Você quis dizer: {titulos_parecidos[:3]}?")
         return
     
     mostra_vizinhos(grafo,show_id)
@@ -176,15 +204,10 @@ def main():
     grafo = cria_grafo(arquivo)
     print("Grafo criado com sucesso")
 
-    titulo_filme = input("Digite o nome do filme")
+    
+    titulo_filme = input("(digite 'sair' para finalizar) Digite o nome do filme: ")
     recomenda(titulo_filme,grafo)
 
 
-
-    
-
-
-
-
 if __name__ == "__main__":
-    main()
+    main() 
