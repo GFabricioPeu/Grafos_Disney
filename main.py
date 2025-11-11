@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import networkx as nx
-import sklearn.feature_extraction.text as skt
-import sklearn.cluster as skc
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 
@@ -53,7 +53,7 @@ def cria_grafo (arquivo):
     # Caso queira deixar a matriz vetorizada ['combinado'] como comentario e tirar o da ['description']
     corpus['combinado'] = (corpus['titulo_limpo'] +' ')*2 + corpus['description'] #combina descrição e titulos
 
-    vectorizer = skt.TfidfVectorizer()
+    vectorizer = TfidfVectorizer()
     matriz_vetorizada = vectorizer.fit_transform(corpus['combinado'])
     # matriz_vetorizada = vectorizer.fit_transform(corpus['description'])
 
@@ -61,7 +61,7 @@ def cria_grafo (arquivo):
 
 
 
-    kmeans = skc.MiniBatchKMeans(n_clusters=100,random_state=9, n_init=10).fit(matriz_vetorizada) # cria clusters
+    kmeans = MiniBatchKMeans(n_clusters=100,random_state=9, n_init=10).fit(matriz_vetorizada) # cria clusters
     corpus['cluster'] = kmeans.labels_
 
     grafo = nx.Graph() #inicia o grafo
