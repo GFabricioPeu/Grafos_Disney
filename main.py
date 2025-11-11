@@ -32,7 +32,7 @@ def limpa_lista(C):
 def trata_arquivo (corpus):
     
     corpus['description']= corpus['description'].apply(limpa_description)
-    colunas = ['cast','director','listed_in','country']
+    colunas = ['cast','director','listed_in','country',]
     for col in colunas:
         corpus[col] = corpus[col].apply(limpa_lista)
     
@@ -41,24 +41,36 @@ def trata_arquivo (corpus):
 
 
 def cria_grafo (arquivo):
-    df = pd.read_csv(arquivo)
+
+    df = pd.read_csv(arquivo) #Abre o arquivo
     corpus = df[['show_id','type','title','director','cast','country','rating','listed_in','description']].fillna('')
     
-    corpus = trata_arquivo(corpus)
+    corpus = trata_arquivo(corpus) # Trata o arquivo
    
-    vectorizer = skt.TfidfVectorizer()
-    matriz_vetorizada = vectorizer.fit_transform(corpus['description'])
+    corpus['titulo_limpo'] = corpus['title'].apply(limpa_description)#"limpa" os titulos
 
-    kmeans = skc.MiniBatchKMeans(n_clusters=100,random_state=9, n_init=10).fit(matriz_vetorizada)
+    # Feito para levar em conta o nome do filme tambem 
+    # Caso queira deixar a matriz vetorizada ['combinado'] como comentario e tirar o da ['description']
+    corpus['combinado'] = (corpus['titulo_limpo'] +' ')*2 + corpus['description'] #combina descrição e titulos
+
+    vectorizer = skt.TfidfVectorizer()
+    matriz_vetorizada = vectorizer.fit_transform(corpus['combinado'])
+    # matriz_vetorizada = vectorizer.fit_transform(corpus['description'])
+
+
+
+
+
+    kmeans = skc.MiniBatchKMeans(n_clusters=100,random_state=9, n_init=10).fit(matriz_vetorizada) # cria clusters
     corpus['cluster'] = kmeans.labels_
 
-    grafo = nx.Graph()
+    grafo = nx.Graph() #inicia o grafo
 
     grafo.graph['titulo_para_id']= {}#Ajuda na hora da busca
 
-    corpus_index = corpus.set_index('show_id')
+    corpus_index = corpus.set_index('show_id') #usar o id como index
 
-    for show_id, row in corpus_index.iterrows():
+    for show_id, row in corpus_index.iterrows(): # cria os nós
         titulo = row.get('title', 'N/A')
         grafo.add_node(
             show_id, 
@@ -85,10 +97,10 @@ def cria_grafo (arquivo):
             grafo.add_edge(show_id, pais, type='Tem_pais')
 
 
-    similaridade = cosine_similarity(matriz_vetorizada)
+    similaridade = cosine_similarity(matriz_vetorizada) #Similaridade de cosseno
     lim_similaridade = 0.1
 
-    for i in range(similaridade.shape[0]):
+    for i in range(similaridade.shape[0]): #cria as vertices
         for j in range(i+1,similaridade.shape[1]):
             if similaridade[i,j] > lim_similaridade:
                 grafo.add_edge(corpus.iloc[i]['show_id'],corpus.iloc[j]['show_id'],type = 'Similar',weight=similaridade[i,j])
@@ -199,15 +211,16 @@ def recomenda(titulo_filme,grafo):
 
 
 def main():
-    arquivo = 'disney_plus_title_list.csv'
+    arquivo = 'disney_plus_titles.csv'
     print("O Grafo esta sendo criado")
     grafo = cria_grafo(arquivo)
     print("Grafo criado com sucesso")
 
-    
-    titulo_filme = input("(digite 'sair' para finalizar) Digite o nome do filme: ")
-    recomenda(titulo_filme,grafo)
-
+    while True:
+        titulo_filme = input("\n(digite 'sair' para finalizar) Digite o nome do filme: ")
+        if titulo_filme.lower() == 'sair':
+            break
+        recomenda(titulo_filme,grafo)
 
 if __name__ == "__main__":
     main() 
