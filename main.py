@@ -11,7 +11,7 @@ remover = {'as','the', 'and', 'if','that','in','when','so','where','at','but','o
 
 
 
-def limpa_description(D):
+def limpa_description(D):#Limpa descrição e titulos
     if not isinstance(D,str):
         return ""
 
@@ -20,7 +20,7 @@ def limpa_description(D):
 
     return ' '.join(palavras_resultado)
 
-def limpa_lista(C):
+def limpa_lista(C): #limpa cada coluna do arquivo
     if not isinstance(C,str):
         return []
     
@@ -29,7 +29,7 @@ def limpa_lista(C):
     return itens
 
 
-def trata_arquivo (corpus):
+def trata_arquivo (corpus): #Limpa o Arquivo
     
     corpus['description']= corpus['description'].apply(limpa_description)
     colunas = ['cast','director','listed_in','country',]
@@ -107,6 +107,8 @@ def cria_grafo (arquivo):
 
     return grafo
 
+
+
 def mostra_vizinhos(grafo,id_central):
     max_recomAda = 5
 
@@ -172,26 +174,25 @@ def mostra_vizinhos(grafo,id_central):
     plt.show()
 
 
-
 def recomenda(titulo_filme,grafo):
 
     print(f"\nBuscando recomendacoes parecidas com {titulo_filme}")
 
-    mapa_de_titulos = grafo.graph.get('titulo_para_id', {})
-    titulo_lower = titulo_filme.lower().strip()
+    mapa_de_titulos = grafo.graph.get('titulo_para_id', {}) #Acha o nó no set
+    titulo_lower = titulo_filme.lower().strip() #Nó pelado minusculo 
     show_id = mapa_de_titulos.get(titulo_lower)
 
-    if not show_id:
+    if not show_id: #se não achou direto do que o usuario escreveu
         print("Titulo nao foi encontrado")
         parece_pouco = [db_titulo for db_titulo in mapa_de_titulos.keys() if db_titulo in titulo_lower]
         
-        if parece_pouco:
+        if parece_pouco: #acha o que mais parece com o que foi escrito
             parece_mais = max(parece_pouco,key=len)
             show_id = mapa_de_titulos[parece_mais]
             achou_parecido = grafo.nodes[show_id].get('title')
             print(f"\n Nao foi possivel encontrar o titulo informado. Porem foi achado um parecido: {achou_parecido}")
 
-    if not show_id:
+    if not show_id:#se nada parece com o que o burro do usuario escreveu
         print("\n Erro em achar o titulo informado no grafo")
 
         parecidos = [
@@ -201,7 +202,7 @@ def recomenda(titulo_filme,grafo):
         if parecidos:
 
             titulos_parecidos = [grafo.nodes[mapa_de_titulos[t]].get('title') for t in parecidos]
-            print(f"Você quis dizer: {titulos_parecidos[:3]}?")
+            print(f"Você quis dizer: {titulos_parecidos[:3]}?") #da uma recomendação pro burro
         return
     
     mostra_vizinhos(grafo,show_id)
