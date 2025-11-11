@@ -151,10 +151,17 @@ def mostra_vizinhos(grafo,id_central):
         subgrafo.add_edge(u, v, weight=score, type='Adamic_Adar')
 
     labels = {node_id: grafo.nodes[node_id].get('title', node_id) for node_id in subgrafo.nodes()} 
-
+    '''
+    SHELLS_LAYOUT
     vizinhos = [node for node in subgrafo.nodes() if node != id_central]
     shells = [ [id_central], vizinhos ]
     pos = nx.shell_layout(subgrafo, shells)
+    '''
+    pos_spectral = nx.spectral_layout(subgrafo)
+    
+    escala = 20
+    pos = {node: (x * escala, y * escala) for node, (x, y) in pos_spectral.items()}
+
     edges_cos = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Similar']
     edges_aa = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Adamic_Adar']
 
