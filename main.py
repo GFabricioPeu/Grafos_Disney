@@ -11,6 +11,7 @@ def main():
         if titulo_filme.lower() == 'sair':
             break
         funcao.recomenda(titulo_filme,grafo)
+        
 
 if __name__ == "__main__":
     main() 

@@ -131,7 +131,18 @@ def mostra_vizinhos(grafo,id_central):
     Ada = nx.adamic_adar_index(grafo,bunch)
 
     recomAda = sorted(Ada,key = lambda item: item[2], reverse = True)
-    recomTopo = recomAda[:max_recomAda]
+    recomTopo = recomAda[:max_recomAda] 
+
+    print(f"\n--- Top {max_recomAda} Recomendações (Adamic-Adar) ---")
+    
+    top_recomendacoes = []
+    for u, v, score in recomTopo:
+        titulo_recomendado = grafo.nodes[v].get('title', 'Título Desconhecido') 
+        top_recomendacoes.append((titulo_recomendado, score))
+    
+    for i, (titulo, score) in enumerate(top_recomendacoes, 1):
+        print(f"{i}. {titulo} (Score: {score:.4f})") 
+    print("-----------------------------------------------------")
 
     vizinhos_Ada = [v for u,v, score in recomTopo]
 
