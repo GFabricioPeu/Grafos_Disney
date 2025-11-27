@@ -47,16 +47,13 @@ def cria_grafo (arquivo):
    
     corpus['titulo_limpo'] = corpus['title'].apply(limpa_description)#"limpa" os titulos
 
-    # Feito para levar em conta o nome do filme tambem 
+    # Feito para levar em conta o titulo tambem 
     # Caso queira deixar a matriz vetorizada ['combinado'] como comentario e tirar o da ['description']
     corpus['combinado'] = (corpus['titulo_limpo'] +' ')*2 + corpus['description'] #combina descrição e titulos
 
     vectorizer = TfidfVectorizer()
     matriz_vetorizada = vectorizer.fit_transform(corpus['combinado'])
     # matriz_vetorizada = vectorizer.fit_transform(corpus['description'])
-
-
-
 
 
     kmeans = MiniBatchKMeans(n_clusters=100,random_state=9, n_init=10).fit(matriz_vetorizada) # cria clusters
@@ -72,7 +69,7 @@ def cria_grafo (arquivo):
         titulo = row.get('title', 'N/A')
         grafo.add_node(
             show_id, 
-            type='Filme', # Tipo de nó
+            type='Titulo', # Tipo de nó
             title=row.get('title', 'N/A'), 
             cluster=row.get('cluster', -1)
         )
@@ -96,7 +93,7 @@ def cria_grafo (arquivo):
 
 
     similaridade = cosine_similarity(matriz_vetorizada) #Similaridade de cosseno
-    lim_similaridade = 0.1
+    lim_similaridade = 0.3
 
     for i in range(similaridade.shape[0]): #cria as vertices
         for j in range(i+1,similaridade.shape[1]):
@@ -114,50 +111,55 @@ def mostra_vizinhos(grafo,id_central):
         print("No nao esta no grafo")
         return
     
+    #Vizinhos por texto
     vizinhos_cos = set()
 
     for vizinho in grafo.neighbors(id_central): #Pega os vizinhos do nó
-        if (grafo.nodes[vizinho].get('type') == 'Filme' and 
+        if (grafo.nodes[vizinho].get('type') == 'Titulo' and 
             grafo.has_edge(id_central, vizinho) and
             grafo.edges[id_central, vizinho].get('type') == 'Similar'):
             vizinhos_cos.add(vizinho)
 
-    #Agora pega os nós Adamic-Adar
-    nos_filme = {n for n, d in grafo.nodes(data=True) if d.get('type') == 'Filme'}
-    nos_Ada = nos_filme - vizinhos_cos - {id_central}
-    
-    bunch = [(id_central,outro_no) for outro_no in nos_Ada]
-   
-    Ada = nx.adamic_adar_index(grafo,bunch)
+    #Começa o calculo do Adamic Adar geral
 
-    recomAda = sorted(Ada,key = lambda item: item[2], reverse = True)
+    #Pega todos os titulos do Grafo
+    nos_titulos = {n for n, d in grafo.nodes(data=True) if d.get('type') == 'Titulo'}
+
+    nos_candidatos = nos_titulos - {id_central}
+    
+    bunch = [(id_central,outro_no) for outro_no in nos_candidatos]
+    Adamic_Adar = nx.adamic_adar_index(grafo,bunch)
+
+    #Pega o top 5
+    recomAda = sorted(Adamic_Adar,key = lambda item: item[2], reverse = True)
     recomTopo = recomAda[:max_recomAda] 
 
     print(f"\n--- Top {max_recomAda} Recomendações (Adamic-Adar) ---")
     
-    top_recomendacoes = []
+    print(f"\n--- Top {max_recomAda} Conexões Estruturais (Adamic-Adar) ---")
+    top_aa_ids = []
     for u, v, score in recomTopo:
-        titulo_recomendado = grafo.nodes[v].get('title', 'Título Desconhecido') 
-        top_recomendacoes.append((titulo_recomendado, score))
+        titulo = grafo.nodes[v].get('title', 'N/A')
+        extra = " (Também é similar por texto)" if v in vizinhos_cos else " (Novo por Adamic Adar)"
+        print(f"Filme: {titulo} | Score: {score:.4f}{extra}")
+        top_aa_ids.append(v)
     
-    for i, (titulo, score) in enumerate(top_recomendacoes, 1):
-        print(f"{i}. {titulo} (Score: {score:.4f})") 
     print("-----------------------------------------------------")
 
-    vizinhos_Ada = [v for u,v, score in recomTopo]
-
-    nos_desenho = list (vizinhos_cos.union(set(vizinhos_Ada)|{id_central}))
+    #Uniao dos vizinhos de texto + Top 5 Adamic Adar + No central
+    nos_desenho = list(vizinhos_cos.union(set(top_aa_ids)) | {id_central})
 
     subgrafo = grafo.subgraph(nos_desenho).copy()
-
     subgrafo.clear_edges()
+
+    #Adiciona as arestas
 
     for v in vizinhos_cos:
         if v in subgrafo:
             subgrafo.add_edge(id_central,v,type='Similar')
 
     for u, v, score in recomTopo:
-        subgrafo.add_edge(u, v, weight=score, type='Adamic_Adar')
+        subgrafo.add_edge(id_central, v, weight=score, type='Adamic_Adar')
 
     labels = {node_id: grafo.nodes[node_id].get('title', node_id) for node_id in subgrafo.nodes()} 
     '''
@@ -166,23 +168,43 @@ def mostra_vizinhos(grafo,id_central):
     shells = [ [id_central], vizinhos ]
     pos = nx.shell_layout(subgrafo, shells)
     '''
-    pos_spectral = nx.spring_layout(subgrafo)
+    pos = nx.spring_layout(subgrafo,seed = 42, k=0.8)
     
-    escala = 20
-    pos = {node: (x * escala, y * escala) for node, (x, y) in pos_spectral.items()}
+    edges_cos = []
+    edges_aa = []
+
+    for u, v, d in subgrafo.edges(data=True):
+        if d.get('type') == 'Adamic_Adar':
+            edges_aa.append((u,v))
+        elif d.get('type') == 'Similar':
+            edges_cos.append((u,v))
+    
+    color_map = []
+    for node in subgrafo.nodes():
+        if node == id_central:
+            color_map.append('red')
+        elif node in top_aa_ids:
+            color_map.append('lightgreen') 
+        else:
+            color_map.append('lightblue')
 
     edges_cos = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Similar']
     edges_aa = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Adamic_Adar']
 
     # Parte que desenha o Grafo
+
+    #Tamanho da figura
     plt.figure(figsize=(15, 15))
-    nx.draw_networkx_nodes(subgrafo, pos, node_color='lightblue', node_size=500)
-    nx.draw_networkx_nodes(subgrafo, pos, nodelist=[id_central], node_color='red', node_size=700)
+
+    #Faz os nos e labels
+    nx.draw_networkx_nodes(subgrafo, pos, node_color=color_map, node_size=600)
     nx.draw_networkx_labels(subgrafo, pos, labels=labels, font_size=8)
 
-    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_cos, edge_color='gray', style='solid', alpha=0.7, label='Similar (Descrição)')
-    
-    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_aa, edge_color='red', style='dashed', alpha=1.0, label='Recomendado (Adamic-Adar)')
+    #Arestas nos de similaridade de texto
+    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_cos, edge_color='gray', style='solid', alpha=0.6, label='Similaridade Texto')
+
+    #Arestas nos Top 5 Adamic Adar
+    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_aa, edge_color='red', style='dashed', width=2.5, label='Top 5 Adamic-Adar')
 
     plt.title(f"Parecidos com: {labels[id_central]}")
     plt.axis('off')
@@ -190,12 +212,12 @@ def mostra_vizinhos(grafo,id_central):
     plt.show()
 
 
-def recomenda(titulo_filme,grafo):
+def recomenda(titulo_usuario,grafo):
 
-    print(f"\nBuscando recomendacoes parecidas com {titulo_filme}")
+    print(f"\nBuscando recomendacoes parecidas com {titulo_usuario}")
 
     mapa_de_titulos = grafo.graph.get('titulo_para_id', {}) #Acha o nó no set
-    titulo_lower = titulo_filme.lower().strip() #Nó pelado minusculo 
+    titulo_lower = titulo_usuario.lower().strip() #Nó pelado minusculo 
     show_id = mapa_de_titulos.get(titulo_lower)
 
     if not show_id: #se não achou direto do que o usuario escreveu
