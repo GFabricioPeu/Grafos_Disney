@@ -74,7 +74,7 @@ def cria_grafo (arquivo):
         titulo = row.get('title', 'N/A')
         grafo.add_node(
             show_id, 
-            type='Filme', # Tipo de nó
+            type='Titulo', # Tipo de nó
             title=row.get('title', 'N/A'), 
             cluster=row.get('cluster', -1)
         )
@@ -119,14 +119,16 @@ def mostra_vizinhos(grafo,id_central):
     vizinhos_cos = set()
 
     for vizinho in grafo.neighbors(id_central): #Pega os vizinhos do nó
-        if (grafo.nodes[vizinho].get('type') == 'Filme' and 
+        if (grafo.nodes[vizinho].get('type') == 'Titulo' and 
             grafo.has_edge(id_central, vizinho) and
             grafo.edges[id_central, vizinho].get('type') == 'Similar'):
             vizinhos_cos.add(vizinho)
 
+    
+
     #Agora pega os nós Adamic-Adar
-    nos_filme = {n for n, d in grafo.nodes(data=True) if d.get('type') == 'Filme'}
-    nos_Ada = nos_filme - vizinhos_cos - {id_central}
+    nos_titulos = {n for n, d in grafo.nodes(data=True) if d.get('type') == 'Titulo'}
+    nos_Ada = nos_titulos - vizinhos_cos - {id_central}
     
     bunch = [(id_central,outro_no) for outro_no in nos_Ada]
    
@@ -157,23 +159,24 @@ def mostra_vizinhos(grafo,id_central):
     shells = [ [id_central], vizinhos ]
     pos = nx.shell_layout(subgrafo, shells)
     '''
-    pos_spectral = nx.spectral_layout(subgrafo)
+
+    pos = nx.spring_layout(subgrafo,dim=2)
     
-    escala = 20
-    pos = {node: (x * escala, y * escala) for node, (x, y) in pos_spectral.items()}
+    escala = 1
+    pos = {node: (x * escala, y * escala,) for node, (x, y) in pos.items()}
 
     edges_cos = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Similar']
     edges_aa = [(u, v) for u, v, d in subgrafo.edges(data=True) if d.get('type') == 'Adamic_Adar']
 
     # Parte que desenha o Grafo
-    plt.figure(figsize=(15, 15))
-    nx.draw_networkx_nodes(subgrafo, pos, node_color='lightblue', node_size=500)
+    plt.figure(figsize=(30, 30))
+    nx.draw_networkx_nodes(subgrafo, pos, node_color='lightblue', node_size=700)
     nx.draw_networkx_nodes(subgrafo, pos, nodelist=[id_central], node_color='red', node_size=700)
     nx.draw_networkx_labels(subgrafo, pos, labels=labels, font_size=8)
 
     nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_cos, edge_color='gray', style='solid', alpha=0.7, label='Similar (Descrição)')
     
-    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_aa, edge_color='red', style='dashed', alpha=1.0, label='Recomendado (Adamic-Adar)')
+    nx.draw_networkx_edges(subgrafo, pos, edgelist=edges_aa, edge_color='red', style='dashed', alpha=0.4, label='Recomendado (Adamic-Adar)')
 
     plt.title(f"Parecidos com: {labels[id_central]}")
     plt.axis('off')
